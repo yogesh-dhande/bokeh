@@ -26,7 +26,6 @@ export module HasProps {
     check_eq?: boolean
     silent?: boolean
     no_change?: boolean
-    defaults?: boolean
     setter_id?: string
   }
 }
@@ -42,7 +41,7 @@ export abstract class HasProps extends Signalable() {
     this.prototype.mixins = []
 
     this.define<HasProps.Props>({
-      id: [ p.Any ],
+      id: [ p.String, () => uniqueId() ],
     })
   }
 
@@ -155,10 +154,15 @@ export abstract class HasProps extends Signalable() {
   readonly change          = new Signal0<this>(this, "change")
   readonly transformchange = new Signal0<this>(this, "transformchange")
 
-  readonly attributes: {[key: string]: any} = {}
-  readonly properties: {[key: string]: any} = {}
+  readonly properties: {[key: string]: Property<unknown>} = {}
 
-  protected readonly _set_after_defaults: {[key: string]: boolean} = {}
+  get attributes(): Attrs {
+    const attrs: Attrs = {}
+    for (const key in this.properties) {
+      attrs[key] = this.properties[key].get_value()
+    }
+    return attrs
+  }
 
   constructor(attrs: Attrs = {}) {
     super()
@@ -166,28 +170,15 @@ export abstract class HasProps extends Signalable() {
     for (const name in this.props) {
       const {type, default_value} = this.props[name]
       if (type != null)
-        this.properties[name] = new type(this, name, default_value)
+        this.properties[name] = new type(this, name, default_value, attrs[name])
       else
         throw new Error(`undefined property type for ${this.type}.${name}`)
     }
 
-    // auto generating ID
-    if (attrs.id == null)
-      this.setv({id: uniqueId()}, {silent: true})
-
-    const deferred = attrs.__deferred__ || false
-    if (deferred) {
-      attrs = clone(attrs)
-      delete attrs.__deferred__
-    }
-
-    this.setv(attrs, {silent: true})
-
     // allowing us to defer initialization when loading many models
     // when loading a bunch of models, we want to do initialization as a second pass
     // because other objects that this one depends on might not be loaded yet
-
-    if (!deferred)
+    if (attrs.__deferred__ === true)
       this.finalize()
   }
 
@@ -201,12 +192,13 @@ export abstract class HasProps extends Signalable() {
     // TODO (bev) split property creation up into two parts so that only the
     // portion of init that can be done happens in HasProps constructor and so
     // that subsequent updates do not duplicate that setup work.
-    for (const name in this.properties) {
-      const prop = this.properties[name]
-      prop.update()
-      if (prop.spec.transform != null)
-        this.connect(prop.spec.transform.change, () => this.transformchange.emit())
-    }
+    //for (const name in this.properties) {
+    //  const prop = this.properties[name]
+    //  prop.update()
+    //  if (prop.spec.transform != null)
+    //    this.connect(prop.spec.transform.change, () => this.transformchange.emit())
+    //}
+
 
     this.initialize()
     this.connect_signals()
@@ -244,25 +236,23 @@ export abstract class HasProps extends Signalable() {
     const changing   = this._changing
     this._changing = true
 
-    const current = this.attributes
-
-    // For each `set` attribute, update or delete the current value.
     for (const attr in attrs) {
+      const prop = this.properties[attr]
       const val = attrs[attr]
-      if (check_eq !== false) {
-        if (!isEqual(current[attr], val))
-          changes.push(attr)
-      } else
-        changes.push(attr)
-      current[attr] = val
+
+      if (check_eq === false || !isEqual(prop.get_value(), val)) {
+        prop.set_value(val)
+        changes.push(prop)
+      }
     }
 
     // Trigger all relevant attribute changes.
     if (!silent) {
       if (changes.length > 0)
         this._pending = true
-      for (let i = 0; i < changes.length; i++)
-        this.properties[changes[i]].change.emit()
+      for (const prop of changes) {
+        prop.change.emit()
+      }
     }
 
     // You might be wondering why there's a `while` loop here. Changes can
@@ -288,9 +278,6 @@ export abstract class HasProps extends Signalable() {
       const prop_name = key
       if (this.props[prop_name] == null)
         throw new Error(`property ${this.type}.${prop_name} wasn't declared`)
-
-      if (!(options != null && options.defaults))
-        this._set_after_defaults[key] = true
     }
 
     if (!isEmpty(attrs)) {
@@ -307,11 +294,11 @@ export abstract class HasProps extends Signalable() {
     }
   }
 
-  getv(prop_name: string): any {
-    if (this.props[prop_name] == null)
-      throw new Error(`property ${this.type}.${prop_name} wasn't declared`)
+  getv(name: string): any {
+    if (this.properties[name] != null)
+      return this.properties[name].get_value()
     else
-      return this.attributes[prop_name]
+      throw new Error(`property ${this.type}.${name} wasn't declared`)
   }
 
   ref(): Ref {
@@ -337,13 +324,14 @@ export abstract class HasProps extends Signalable() {
   // Document's models, subtypes that do that have to remove their
   // extra attributes here.
   serializable_attributes(): Attrs {
-    const attrs: Attrs = {}
-    for (const name in this.attributes) {
-      const value = this.attributes[name]
-      if (this.attribute_is_serializable(name))
-        attrs[name] = value
+    const {attributes} = this
+
+    for (const name in attributes) {
+      if (!this.attribute_is_serializable(name))
+        delete attributes[name]
     }
-    return attrs
+
+    return attributes
   }
 
   static _value_to_json(_key: string, value: any, _optional_parent_object: any): any {
@@ -374,11 +362,10 @@ export abstract class HasProps extends Signalable() {
     const attrs: Attrs = {}
     for (const key in serializable) {
       if (serializable.hasOwnProperty(key)) {
-        const value = serializable[key]
-        if (include_defaults)
+        if (include_defaults || this.properties[key].dirty) {
+          const value = serializable[key]
           attrs[key] = value
-        else if (key in this._set_after_defaults)
-          attrs[key] = value
+        }
       }
     }
     return value_to_json("attributes", attrs, this)
@@ -512,7 +499,7 @@ export abstract class HasProps extends Signalable() {
       if (!(prop instanceof p.VectorSpec))
         continue
       // this skips optional properties like radius for circles
-      if (prop.optional && prop.spec.value == null && !(name in this._set_after_defaults))
+      if (prop.optional && prop.spec.value == null && !prop.dirty)
         continue
 
       const array = prop.array(source)

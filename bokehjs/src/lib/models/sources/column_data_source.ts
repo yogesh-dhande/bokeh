@@ -173,14 +173,12 @@ export class ColumnDataSource extends ColumnarDataSource {
     const attrs: Attrs = {}
     const obj = this.serializable_attributes()
     for (const key of keys(obj)) {
-      let value = obj[key]
-      if (key === 'data')
-        value = encode_column_data(value as Data, this._shapes)
-
-      if (include_defaults)
+      if (include_defaults || this.properties[key].dirty) {
+        let value = obj[key]
+        if (key === "data")
+          value = encode_column_data(value as Data, this._shapes)
         attrs[key] = value
-      else if (key in this._set_after_defaults)
-        attrs[key] = value
+      }
     }
     return value_to_json("attributes", attrs, this)
   }

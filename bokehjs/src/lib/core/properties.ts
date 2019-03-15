@@ -40,7 +40,7 @@ export type DefineOf<P> = {
 }
 
 export interface PropertyConstructor<T> {
-  new (obj: HasProps, attr: string, default_value?: (obj: HasProps) => T): Property<T>
+  new (obj: HasProps, attr: string, default_value?: (obj: HasProps) => T, initial_value?: T): Property<T>
   readonly prototype: Property<T>
 }
 
@@ -57,19 +57,49 @@ export abstract class Property<T> extends Signalable() {
 
   optional: boolean = false
 
+  get dirty(): boolean {
+    return this._dirty
+  }
+
+  private _dirty: boolean = false
+
   readonly change: Signal0<HasProps>
 
   constructor(readonly obj: HasProps,
               readonly attr: string,
-              readonly default_value?: (obj: HasProps) => T) {
+              readonly default_value?: (obj: HasProps) => T,
+              initial_value?: T) {
     super()
     this.change = new Signal0(this.obj, "change")
-    this._init()
-    this.connect(this.change, () => this._init())
+
+    let attr_value: T
+    if (initial_value !== undefined) {
+      attr_value = initial_value
+      this._dirty = true
+    } else {
+      if (default_value !== undefined)
+        attr_value = default_value(obj)
+      else
+        attr_value = null
+    }
+
+    if (isSpec(attr_value))
+      this.spec = attr_value
+    else
+      this.spec = {value: attr_value}
+
+    //if (this.dataspec && this.spec.field != null && !isString(this.spec.field))
+    //  throw new Error(`field value for property '${attr}' is not a string`)
+
+    if (this.spec.value != null)
+      this.validate(this.spec.value)
+
+    this.init()
   }
 
-  update(): void {
-    this._init()
+  toString(): string {
+    /*${this.name}*/
+    return `Prop(${this.obj}.${this.attr}, spec: ${valueToString(this.spec)})`
   }
 
   // ----- customizable policies
@@ -98,43 +128,6 @@ export abstract class Property<T> extends Signalable() {
     if (this.spec.transform != null && do_spec_transform)
       ret = this.spec.transform.compute(ret)
     return ret
-  }
-
-  // ----- private methods
-
-  /*protected*/ _init(): void {
-    const obj = this.obj
-    const attr = this.attr
-    let attr_value: any = obj.getv(attr)
-
-    if (attr_value === undefined) {
-      const default_value = this.default_value
-      if (default_value !== undefined)
-        attr_value = default_value(obj)
-      else
-        attr_value = null
-      obj.setv({[attr]: attr_value}, {silent: true, defaults: true})
-    }
-
-    if (isArray(attr_value))
-      this.spec = {value: attr_value}
-    else if (isSpec(attr_value))
-      this.spec = attr_value
-    else
-      this.spec = {value: attr_value}
-
-    //if (this.dataspec && this.spec.field != null && !isString(this.spec.field))
-    //  throw new Error(`field value for property '${attr}' is not a string`)
-
-    if (this.spec.value != null)
-      this.validate(this.spec.value)
-
-    this.init()
-  }
-
-  toString(): string {
-    /*${this.name}*/
-    return `Prop(${this.obj}.${this.attr}, spec: ${valueToString(this.spec)})`
   }
 }
 
