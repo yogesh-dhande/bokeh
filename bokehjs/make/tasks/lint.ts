@@ -82,4 +82,4 @@ task("tslint:examples", async () => tslint(paths.src_dir.examples))
 
 task("tslint", ["tslint:make", "tslint:lib", "tslint:compiler", "tslint:test", "tslint:examples"])
 
-task("lint", ["eslint", "tslint"])
+task("lint", [/*"eslint",*/ "tslint"])
