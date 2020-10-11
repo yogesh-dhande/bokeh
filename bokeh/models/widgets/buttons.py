@@ -43,6 +43,7 @@ from .widget import Widget
 __all__ = (
     'AbstractButton',
     'Button',
+    "IconButton",
     'ButtonLike',
     'Dropdown',
     'Toggle',
@@ -102,6 +103,16 @@ class Button(AbstractButton):
     def js_on_click(self, handler):
         ''' Set up a JavaScript handler for button clicks. '''
         self.js_on_event(ButtonClick, handler)
+
+
+class IconButton(Button):
+    """
+    Does not use a label for the button and eliminates the space
+    between the icon and the empty label if a regular button is
+    used with an empty label.
+    """
+    pass
+
 
 class Toggle(AbstractButton):
     ''' A two-state toggle button.

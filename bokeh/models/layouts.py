@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 #-----------------------------------------------------------------------------
 # Imports
 #-----------------------------------------------------------------------------
-
+from biokeh.ui.callbacks import set_callback
 # Bokeh imports
 from ..core.enums import Align, Location, SizingMode, SizingPolicy
 from ..core.has_props import abstract
@@ -64,6 +64,9 @@ __all__ = (
     'Spacer',
     'Tabs',
     'WidgetBox',
+    "UIColumn",
+    "UIRow",
+    "CustomToolbar"
 )
 
 #-----------------------------------------------------------------------------
@@ -487,3 +490,79 @@ class WidgetBox(Column):
         super().__init__(*args, **kw)
         from ..util.deprecation import deprecated
         deprecated("'WidgetBox' is deprecated and will be removed in Bokeh 3.0, use 'bokeh.models.Column' instead")
+
+
+class UIColumn(Column):
+
+    ui_dict: dict = Dict(String, Instance(Model))
+    prop_ui_dict: dict = Dict(String, Instance(Model))
+
+    def __init__(
+        self, children=None, ui_dict=None, prop_ui_dict=None, *args, **kwargs,
+    ):
+        # Enforce initialization of ui_dict to help with testing
+        if children is not None:
+            raise ValueError("ui_dict must be provided for UI Column instead of children")
+
+        ui_dict = ui_dict if ui_dict else {}
+        if prop_ui_dict is None:
+            prop_ui_dict = ui_dict
+
+        children = list(ui_dict.values())
+
+        super(UIColumn, self).__init__(
+            children=children, ui_dict=ui_dict, prop_ui_dict=prop_ui_dict, *args, **kwargs,
+        )
+
+        def update_children(attr, old, new):
+            self.children = list(self.ui_dict.values())
+            self.prop_ui_dict.update(self.ui_dict)
+
+        set_callback(self, "ui_dict", update_children)
+
+
+class UIRow(Row):
+    ui_dict: dict = Dict(String, Instance(LayoutDOM))
+    prop_ui_dict: dict = Dict(String, Instance(LayoutDOM))
+
+    def __init__(
+        self, children=None, ui_dict=None, prop_ui_dict=None, *args, **kwargs,
+    ):
+        # Enforce initialization of ui_dict to help with testing
+        if ui_dict is None or children is not None:
+            raise ValueError("ui_dict must be provided for UIRow instead of children")
+        if prop_ui_dict is None:
+            prop_ui_dict = ui_dict
+        children = list(ui_dict.values())
+        super(UIRow, self).__init__(
+            children=children, ui_dict=ui_dict, prop_ui_dict=prop_ui_dict, *args, **kwargs,
+        )
+
+        def update_children(attr, old, new):
+            self.children = list(self.ui_dict.values())
+            self.prop_ui_dict.update(self.ui_dict)
+
+        set_callback(self, "ui_dict", update_children)
+
+
+class CustomToolbar(Row):
+    ui_dict: dict = Dict(String, Instance(Model))
+    prop_ui_dict: dict = Dict(String, Instance(Model))
+
+    def __init__(self, children=None, ui_dict=None, prop_ui_dict=None, **kwargs):
+        # Enforce initialization of ui_dict to help with testing
+        if ui_dict is None or children is not None:
+            raise ValueError("ui_dict must be provided for CustomToolbar instead of children")
+        if prop_ui_dict is None:
+            prop_ui_dict = ui_dict
+        children = list(ui_dict.values())
+        super(CustomToolbar, self).__init__(children=children, ui_dict=ui_dict, prop_ui_dict=prop_ui_dict, **kwargs)
+
+        def update_children(attr, old, new):
+            self.children = list(self.ui_dict.values())
+
+        set_callback(self, "ui_dict", update_children)
+
+    def add_tools(self, tools):
+        for tool in tools:
+            self.ui_dict[tool.label] = tool
