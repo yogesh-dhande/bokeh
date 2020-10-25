@@ -14,39 +14,40 @@
 import logging # isort:skip
 log = logging.getLogger(__name__)
 
+# Bokeh imports
 #-----------------------------------------------------------------------------
 # Imports
 #-----------------------------------------------------------------------------
-from biokeh.ui.callbacks import set_callback
-# Bokeh imports
-from ..core.enums import Align, Location, SizingMode, SizingPolicy
+from ..core.callbacks import set_callback
+from ..core.enums import Align
+from ..core.enums import Location
+from ..core.enums import SizingMode
+from ..core.enums import SizingPolicy
 from ..core.has_props import abstract
-from ..core.properties import (
-    Auto,
-    Bool,
-    Color,
-    Dict,
-    Either,
-    Enum,
-    Float,
-    Instance,
-    Int,
-    List,
-    NonNegativeInt,
-    Seq,
-    String,
-    Struct,
-    Tuple,
-)
-from ..core.validation import error, warning
-from ..core.validation.errors import MIN_PREFERRED_MAX_HEIGHT, MIN_PREFERRED_MAX_WIDTH
-from ..core.validation.warnings import (
-    BOTH_CHILD_AND_ROOT,
-    EMPTY_LAYOUT,
-    FIXED_HEIGHT_POLICY,
-    FIXED_SIZING_MODE,
-    FIXED_WIDTH_POLICY,
-)
+from ..core.properties import Auto
+from ..core.properties import Bool
+from ..core.properties import Color
+from ..core.properties import Dict
+from ..core.properties import Either
+from ..core.properties import Enum
+from ..core.properties import Float
+from ..core.properties import Instance
+from ..core.properties import Int
+from ..core.properties import List
+from ..core.properties import NonNegativeInt
+from ..core.properties import Seq
+from ..core.properties import String
+from ..core.properties import Struct
+from ..core.properties import Tuple
+from ..core.validation import error
+from ..core.validation import warning
+from ..core.validation.errors import MIN_PREFERRED_MAX_HEIGHT
+from ..core.validation.errors import MIN_PREFERRED_MAX_WIDTH
+from ..core.validation.warnings import BOTH_CHILD_AND_ROOT
+from ..core.validation.warnings import EMPTY_LAYOUT
+from ..core.validation.warnings import FIXED_HEIGHT_POLICY
+from ..core.validation.warnings import FIXED_SIZING_MODE
+from ..core.validation.warnings import FIXED_WIDTH_POLICY
 from ..model import Model
 
 #-----------------------------------------------------------------------------
@@ -372,6 +373,7 @@ class Box(LayoutDOM):
 
     @warning(EMPTY_LAYOUT)
     def _check_empty_layout(self):
+        # Standard library imports
         from itertools import chain
         if not list(chain(self.children)):
             return str(self)
@@ -488,6 +490,7 @@ class WidgetBox(Column):
     '''
     def __init__(self, *args, **kw):
         super().__init__(*args, **kw)
+        # Bokeh imports
         from ..util.deprecation import deprecated
         deprecated("'WidgetBox' is deprecated and will be removed in Bokeh 3.0, use 'bokeh.models.Column' instead")
 
